@@ -9,7 +9,8 @@ import {
   Play,
   RefreshCw,
   Send,
-  Sparkles
+  Sparkles,
+  History
 } from 'lucide-react';
 
 const DEFAULT_REQUIREMENTS = `Proposal must include:
@@ -40,19 +41,22 @@ const EMPTY_PROJECT = {
 
 const PROJECT_FIELDS = [
   ['problem', 'Problem'],
+  ['goal', 'Goal'],
+  ['references', 'Relevant Work'],
+  ['referenceAttachments', 'References'],
   ['method', 'Method'],
-  ['evaluation', 'Evaluation'],
-  ['timeline', 'Timeline'],
   ['resources', 'Resources'],
-  ['references', 'Sources']
+  ['timeline', 'Timeline'],
+  ['evaluation', 'Evaluation'],
+  ['pageLimits', 'Page Limits']
 ];
 
 const STAGES = [
-  ['1', 'Extract', 'LLM turns the rough idea into structured proposal data'],
-  ['2', 'Decide', 'You choose or edit candidate framings'],
-  ['3', 'Assemble', 'Accepted fields become project state'],
-  ['4', 'Draft', 'LLM writes proposal artifacts'],
-  ['5', 'Review', 'Matrix and critique check weak spots']
+  ['1', 'Setup', 'Provide a rough idea or configure your default project scope'],
+  ['2', 'Refine', 'Step through the foundational research criteria details'],
+  ['3', 'Assemble', 'Review your selected settings inside the project state'],
+  ['4', 'Draft', 'LLM writes the formatted LaTeX proposal artifact'],
+  ['5', 'Review', 'Matrix and evaluation report critique weak spots']
 ];
 
 const TABS = [
@@ -64,23 +68,121 @@ const TABS = [
 
 const MEMORY_KEY = 'proposal-agent-final-project-memory-v1';
 
+const QUESTIONNAIRE_STEPS = [
+  {
+    id: 'category',
+    field: 'problem',
+    title: 'Research Topic',
+    prompt: 'Please select the category that best describes your research topic:',
+    options: [
+      { key: 'A', label: 'Applied Science / Engineering', value: 'Applied Science / Engineering: Developing new technologies, software, algorithms, or physical systems.' },
+      { key: 'B', label: 'Social Sciences / Humanities', value: 'Social Sciences / Humanities: Studying human behavior, society, culture, education, or business trends.' },
+      { key: 'C', label: 'Theoretical / Pure Science', value: 'Theoretical / Pure Science: Exploring abstract concepts, mathematical proofs, or fundamental scientific principles.' }
+    ]
+  },
+  {
+    id: 'goals',
+    field: 'goal',
+    title: 'Goals',
+    prompt: 'What is the primary goal of this research project?',
+    options: [
+      { key: 'A', label: 'Innovation & Creation', value: 'Innovation & Creation: To design, build, and test a brand-new solution, tool, or framework.' },
+      { key: 'B', label: 'Optimization & Improvement', value: 'Optimization & Improvement: To analyze an existing system or process and find ways to make it faster, more efficient, or more accurate.' },
+      { key: 'C', label: 'Exploration & Discovery', value: 'Exploration & Discovery: To investigate an unsolved problem or phenomenon to understand how and why it happens.' }
+    ]
+  },
+  {
+    id: 'relevantWork',
+    field: 'references',
+    title: 'Relevant Work',
+    prompt: 'How would you like to provide your background literature or relevant work?',
+    options: [
+      { key: 'A', label: 'Direct URL Links', value: 'Direct URL Links: I will provide web links to specific papers, articles, or digital libraries (e.g., Google Scholar, arXiv).' },
+      { key: 'B', label: 'Reference List text', value: 'Reference List text: I will paste a formatted list of citations/text references (e.g., APA, IEEE format).' },
+      { key: 'C', label: 'No links yet (AI-Generated)', value: 'No links yet (AI-Generated): I don\'t have links yet; please suggest relevant papers based on my topic.' }
+    ]
+  },
+  {
+    id: 'methodology',
+    field: 'method',
+    title: 'Research Method',
+    prompt: 'Please select your primary research methodology:',
+    options: [
+      { key: 'A', label: 'Quantitative', value: 'Quantitative (Experiments, surveys, statistical data, numbers)' },
+      { key: 'B', label: 'Qualitative', value: 'Qualitative (Interviews, case studies, open-ended text, meanings)' },
+      { key: 'C', label: 'Mixed Methods', value: 'Mixed Methods (A combination of both numbers and deep context)' }
+    ]
+  },
+  {
+    id: 'data',
+    field: 'resources',
+    title: 'Data',
+    prompt: 'What type of data or resources will your research rely on?',
+    options: [
+      { key: 'A', label: 'Public Dataset / Open-Source', value: 'Public Dataset / Open-Source: I am using existing, publicly available data (e.g., Kaggle, government databases) and will provide the links.' },
+      { key: 'B', label: 'Proprietary / Self-Collected Data', value: 'Proprietary / Self-Collected Data: I am gathering my own data via surveys, experiments, or private company data (no public links available).' },
+      { key: 'C', label: 'Simulated / Synthetic Data', value: 'Simulated / Synthetic Data: I will be generating artificial data or running code simulations to test my hypothesis.' }
+    ]
+  },
+  {
+    id: 'timeline',
+    field: 'timeline',
+    title: 'Timeline (Milestones)',
+    prompt: 'What is the expected scope and timeline for your research milestones?',
+    options: [
+      { key: 'A', label: 'Short-term (1-3 months)', value: 'Short-term (1-3 months): Rapid prototyping, quick data collection, and immediate analysis.' },
+      { key: 'B', label: 'Medium-term (3-6 months)', value: 'Medium-term (3-6 months): Standard academic semester timeline with distinct phases for literature review, testing, and writing.' },
+      { key: 'C', label: 'Long-term (6+ months)', value: 'Long-term (6+ months): Extensive, multi-phase project requiring deep data collection, iterative testing, and prolonged analysis.' }
+    ]
+  },
+  {
+    id: 'contributions',
+    field: 'evaluation',
+    title: 'Contributions',
+    prompt: 'What is the main contribution your research will make?',
+    options: [
+      { key: 'A', label: 'Practical Contribution', value: 'Practical Contribution: Creating a tangible tool, software, or methodology that people can directly use to solve a real-world problem.' },
+      { key: 'B', label: 'Theoretical Contribution', value: 'Theoretical Contribution: Adding new knowledge, expanding an existing theory, or filling a gap in current academic literature.' },
+      { key: 'C', label: 'Policy / Decision-Making Contribution', value: 'Policy / Decision-Making Contribution: Providing recommendations, insights, or data to help guide industry standards or government policies.' }
+    ]
+  },
+  {
+    id: 'pageLimits',
+    field: 'pageLimits',
+    title: 'Page Limits',
+    prompt: 'Choose the target layout length profile constraint for this draft:',
+    options: [
+      { key: 'A', label: 'Short', value: 'Max 2 pages total. Keep sections highly compressed and succinct.' },
+      { key: 'B', label: 'Standard', value: 'Target 4 pages. Full methodology breakdowns and comprehensive checklists.' },
+      { key: 'C', label: 'Long', value: 'Unrestricted deep layout structure formatting allowed.' }
+    ]
+  }
+];
+
 function App() {
   const [topicInput, setTopicInput] = useState('');
   const [project, setProject] = useState(EMPTY_PROJECT);
-  const [fieldSuggestions, setFieldSuggestions] = useState([]);
-  const [decisions, setDecisions] = useState([]);
-  const [questions, setQuestions] = useState([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [selections, setSelections] = useState({});
   const [customNote, setCustomNote] = useState('');
-  const [result, setResult] = useState(null);
+  const [revisionNote, setRevisionNote] = useState(''); // State for revision module
+  
+  // Revision State Arrays
+  const [versions, setVersions] = useState([]); 
+  const [currentVersionIndex, setCurrentVersionIndex] = useState(-1);
+
   const [pdfUrl, setPdfUrl] = useState('');
   const [runLog, setRunLog] = useState([]);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('pdf');
-  const [suggestionIndex, setSuggestionIndex] = useState(0);
-  const [decisionIndex, setDecisionIndex] = useState(0);
   const [memorySavedAt, setMemorySavedAt] = useState('');
   const [memoryReady, setMemoryReady] = useState(false);
+
+  // Derived current active artifact result
+  const result = useMemo(() => {
+    return versions[currentVersionIndex] || null;
+  }, [versions, currentVersionIndex]);
 
   const matrixStats = useMemo(() => {
     const rows = result?.complianceMatrix || [];
@@ -89,10 +191,7 @@ function App() {
   }, [result]);
 
   const acceptedCount = PROJECT_FIELDS.filter(([field]) => Boolean(project[field])).length;
-  const acceptedSuggestionCount = fieldSuggestions.filter((suggestion) => project[suggestion.field] === suggestion.value).length;
-  const currentSuggestion = fieldSuggestions[suggestionIndex] || null;
-  const currentDecision = decisions[decisionIndex] || null;
-  const currentQuestion = questions[0];
+  const currentStep = QUESTIONNAIRE_STEPS[currentStepIndex] || null;
 
   useEffect(() => {
     loadSavedMemory({ silent: true });
@@ -105,27 +204,28 @@ function App() {
     };
   }, [pdfUrl]);
 
+  // Handle PDF update trigger whenever the selected active version changes
+  useEffect(() => {
+    async function triggerPdfSync() {
+      if (result?.proposalLatex) {
+        try {
+          const nextPdfUrl = await exportPdfUrl(result.proposalLatex, project.title || 'proposal');
+          updatePdfUrl(nextPdfUrl);
+        } catch {
+          updatePdfUrl('');
+        }
+      } else {
+        updatePdfUrl('');
+      }
+    }
+    triggerPdfSync();
+  }, [result]);
+
   useEffect(() => {
     if (!memoryReady) return;
-
-    if (!topicInput && !fieldSuggestions.length && !decisions.length && !result) {
-      return;
-    }
-
+    if (!topicInput && !result) return;
     saveMemory({ silent: true });
-  }, [
-    memoryReady,
-    topicInput,
-    project,
-    fieldSuggestions,
-    decisions,
-    questions,
-    result,
-    runLog,
-    activeTab,
-    suggestionIndex,
-    decisionIndex
-  ]);
+  }, [memoryReady, topicInput, project, currentStepIndex, selections, versions, currentVersionIndex, runLog, activeTab]);
 
   async function startAgent() {
     return startAgentForTopic(topicInput);
@@ -149,20 +249,39 @@ function App() {
       });
 
       setProject({ ...EMPTY_PROJECT, ...data.project });
-      setFieldSuggestions(data.fieldSuggestions || []);
-      setDecisions(data.decisions || []);
-      setQuestions(data.questions || []);
-      setSuggestionIndex(0);
-      setDecisionIndex(0);
+      setCurrentStepIndex(0);
+      setSelections({});
       setRunLog([
-        logEntry('Extract', data.runMessage || 'LLM prepared structured suggestions.'),
-        logEntry('Decide', `Review ${(data.fieldSuggestions || []).length} fields and ${(data.decisions || []).length} decision card(s).`)
+        logEntry('Extract', data.runMessage || 'Initialized proposal requirements.'),
+        logEntry('Refine', 'Please cycle through the research strategy config choices.')
       ]);
       setCustomNote('');
     } catch (requestError) {
       setError(readError(requestError));
     } finally {
       setStatus('idle');
+    }
+  }
+
+  function handleSelectOption(step, option) {
+    const nextSelections = { ...selections, [step.id]: option.key };
+    setSelections(nextSelections);
+
+    const targetField = step.field;
+    
+    setProject((current) => ({
+      ...current,
+      [targetField]: `${step.title}: ${option.value}`,
+      topic: current.topic || current.title || topicInput
+    }));
+
+    setRunLog((current) => [
+      ...current,
+      logEntry('Config', `Selected Option [${option.key}] for ${step.title}`)
+    ]);
+
+    if (currentStepIndex < QUESTIONNAIRE_STEPS.length - 1) {
+      setCurrentStepIndex((prev) => prev + 1);
     }
   }
 
@@ -176,10 +295,10 @@ function App() {
     try {
       const data = await postJson('/api/agent/answer', {
         project,
-        question: currentQuestion || {
-          field: 'method',
-          question: 'Integrate this user note into the project state.',
-          reason: 'The user provided a custom refinement.',
+        question: {
+          field: currentStep?.field || 'method',
+          question: 'Integrate this user text note into the configuration logic.',
+          reason: 'User explicitly supplied a manual customization note.',
           priority: 'Medium'
         },
         answer: trimmed,
@@ -187,15 +306,9 @@ function App() {
       });
 
       setProject({ ...EMPTY_PROJECT, ...data.project });
-      setFieldSuggestions(data.fieldSuggestions || []);
-      setDecisions(data.decisions || []);
-      setQuestions(data.questions || []);
-      setSuggestionIndex(0);
-      setDecisionIndex(0);
       setRunLog((current) => [
         ...current,
-        logEntry('Update', data.runMessage || 'Integrated custom note.'),
-        logEntry('Decide', `Refreshed ${(data.fieldSuggestions || []).length} suggested field(s).`)
+        logEntry('Update', data.runMessage || 'Integrated custom text updates into state data.')
       ]);
       setCustomNote('');
       clearArtifacts();
@@ -213,18 +326,19 @@ function App() {
     try {
       const data = await postJson('/api/proposal', {
         ...project,
-        topic: project.topic || project.title,
+        topic: project.topic || project.title || topicInput,
         requirements: DEFAULT_REQUIREMENTS
       });
-      const nextPdfUrl = await exportPdfUrl(data.proposalLatex, project.title || 'proposal');
 
-      setResult(data);
-      updatePdfUrl(nextPdfUrl);
+      // Append new version to array and point current view directly to it
+      setVersions((prev) => [...prev, data]);
+      setCurrentVersionIndex((prev) => prev + 1);
       setActiveTab('pdf');
+      
       setRunLog((current) => [
         ...current,
-        logEntry('Draft', `Generated proposal using ${data.mode}.`),
-        logEntry('Review', `Coverage ${countCovered(data.complianceMatrix)}/${data.complianceMatrix?.length || 0}.`)
+        logEntry('Draft', `Generated initial proposal template version v${versions.length + 1} using ${data.mode}.`),
+        logEntry('Review', `Compliance rate is ${countCovered(data.complianceMatrix)}/${data.complianceMatrix?.length || 0}.`)
       ]);
     } catch (requestError) {
       setError(readError(requestError));
@@ -233,40 +347,39 @@ function App() {
     }
   }
 
-  function acceptSuggestion(suggestion) {
-    updateProjectField(suggestion.field, suggestion.value);
-    advanceSuggestion();
-    setRunLog((current) => [...current, logEntry('Accept', `Accepted ${suggestion.label || suggestion.field}.`)]);
-  }
+  // NEW: Function to submit revisions of the current LaTeX artifact to backend pipelines
+  async function submitRevision() {
+    const trimmed = revisionNote.trim();
+    if (!trimmed || !result) return;
 
-  function skipSuggestion() {
-    if (!currentSuggestion) return;
-    advanceSuggestion();
-    setRunLog((current) => [...current, logEntry('Skip', `Skipped ${currentSuggestion.label || currentSuggestion.field}.`)]);
-  }
+    setStatus('drafting');
+    setError('');
 
-  function advanceSuggestion() {
-    setSuggestionIndex((current) => Math.min(current + 1, Math.max(fieldSuggestions.length - 1, 0)));
-  }
+    try {
+      const data = await postJson('/api/proposal/revision', {
+        ...project,
+        topic: project.topic || project.title || topicInput,
+        currentLatex: result.proposalLatex,
+        revisionComments: trimmed,
+        requirements: DEFAULT_REQUIREMENTS
+      });
 
-  function chooseOption(decision, option) {
-    updateProjectField(decision.field, option.value);
-    setDecisions((current) => {
-      const next = current.filter((item) => item.id !== decision.id);
-      setDecisionIndex((index) => Math.min(index, Math.max(next.length - 1, 0)));
-      return next;
-    });
-    setRunLog((current) => [...current, logEntry('Decision', `Selected ${option.label} for ${decision.title}.`)]);
-  }
+      // Append revision as a new active historical version block instance node
+      setVersions((prev) => [...prev, data]);
+      setCurrentVersionIndex((prev) => prev + 1);
+      setRevisionNote('');
+      setActiveTab('pdf');
 
-  function skipDecision() {
-    if (!currentDecision) return;
-    advanceDecision();
-    setRunLog((current) => [...current, logEntry('Skip', `Skipped ${currentDecision.title}.`)]);
-  }
-
-  function advanceDecision() {
-    setDecisionIndex((current) => Math.min(current + 1, Math.max(decisions.length - 1, 0)));
+      setRunLog((current) => [
+        ...current,
+        logEntry('Revision', `Generated revised version v${versions.length + 1} via feedback.`),
+        logEntry('Review', `Updated Compliance rate is ${countCovered(data.complianceMatrix)}/${data.complianceMatrix?.length || 0}.`)
+      ]);
+    } catch (requestError) {
+      setError(readError(requestError));
+    } finally {
+      setStatus('idle');
+    }
   }
 
   function updateProjectField(field, value) {
@@ -279,7 +392,8 @@ function App() {
   }
 
   function clearArtifacts() {
-    setResult(null);
+    setVersions([]);
+    setCurrentVersionIndex(-1);
     updatePdfUrl('');
   }
 
@@ -293,16 +407,14 @@ function App() {
   function reset() {
     setTopicInput('');
     setProject(EMPTY_PROJECT);
-    setFieldSuggestions([]);
-    setDecisions([]);
-    setQuestions([]);
+    setCurrentStepIndex(0);
+    setSelections({});
     setCustomNote('');
+    setRevisionNote('');
     clearArtifacts();
     setRunLog([]);
     setError('');
     setActiveTab('pdf');
-    setSuggestionIndex(0);
-    setDecisionIndex(0);
   }
 
   function downloadLatex() {
@@ -311,7 +423,7 @@ function App() {
     const href = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = href;
-    anchor.download = 'proposal.tex';
+    anchor.download = `proposal-v${currentVersionIndex + 1}.tex`;
     anchor.click();
     URL.revokeObjectURL(href);
   }
@@ -326,10 +438,10 @@ function App() {
       const href = pdfUrl || (await exportPdfUrl(result.proposalLatex, project.title || 'proposal'));
       const anchor = document.createElement('a');
       anchor.href = href;
-      anchor.download = 'proposal.pdf';
+      anchor.download = `proposal-v${currentVersionIndex + 1}.pdf`;
       anchor.click();
       if (!pdfUrl) URL.revokeObjectURL(href);
-      setRunLog((current) => [...current, logEntry('Export', 'Downloaded proposal.pdf.')]);
+      setRunLog((current) => [...current, logEntry('Export', `Downloaded compiled PDF structure configuration version v${currentVersionIndex + 1}.`)]);
     } catch (requestError) {
       setError(readError(requestError));
     } finally {
@@ -342,28 +454,26 @@ function App() {
       savedAt: new Date().toISOString(),
       topicInput,
       project,
-      fieldSuggestions,
-      decisions,
-      questions,
-      result: compactResult(result),
+      currentStepIndex,
+      selections,
+      versions: versions.map(compactResult),
+      currentVersionIndex,
       runLog,
-      activeTab,
-      suggestionIndex,
-      decisionIndex
+      activeTab
     };
 
     localStorage.setItem(MEMORY_KEY, JSON.stringify(snapshot));
     setMemorySavedAt(snapshot.savedAt);
 
     if (!silent) {
-      setRunLog((current) => [...current, logEntry('Memory', 'Saved workspace memory.')]);
+      setRunLog((current) => [...current, logEntry('Memory', 'Saved workspace cache memory.')]);
     }
   }
 
   async function loadSavedMemory({ silent = false } = {}) {
     const raw = localStorage.getItem(MEMORY_KEY);
     if (!raw) {
-      if (!silent) setError('No saved memory found.');
+      if (!silent) setError('No saved memory session state discovered.');
       return;
     }
 
@@ -371,32 +481,20 @@ function App() {
       const snapshot = JSON.parse(raw);
       setTopicInput(snapshot.topicInput || '');
       setProject({ ...EMPTY_PROJECT, ...(snapshot.project || {}) });
-      setFieldSuggestions(Array.isArray(snapshot.fieldSuggestions) ? snapshot.fieldSuggestions : []);
-      setDecisions(Array.isArray(snapshot.decisions) ? snapshot.decisions : []);
-      setQuestions(Array.isArray(snapshot.questions) ? snapshot.questions : []);
-      setResult(snapshot.result || null);
+      setCurrentStepIndex(Number(snapshot.currentStepIndex || 0));
+      setSelections(snapshot.selections || {});
+      setVersions(Array.isArray(snapshot.versions) ? snapshot.versions : []);
+      setCurrentVersionIndex(typeof snapshot.currentVersionIndex === 'number' ? snapshot.currentVersionIndex : -1);
       setRunLog(Array.isArray(snapshot.runLog) ? snapshot.runLog : []);
       setActiveTab(snapshot.activeTab || 'pdf');
-      setSuggestionIndex(Number(snapshot.suggestionIndex || 0));
-      setDecisionIndex(Number(snapshot.decisionIndex || 0));
       setMemorySavedAt(snapshot.savedAt || '');
       setError('');
 
-      if (snapshot.result?.proposalLatex) {
-        try {
-          updatePdfUrl(await exportPdfUrl(snapshot.result.proposalLatex, snapshot.project?.title || 'proposal'));
-        } catch {
-          updatePdfUrl('');
-        }
-      } else {
-        updatePdfUrl('');
-      }
-
       if (!silent) {
-        setRunLog((current) => [...current, logEntry('Memory', 'Reloaded saved workspace memory.')]);
+        setRunLog((current) => [...current, logEntry('Memory', 'Reloaded active snapshot state memory.')]);
       }
     } catch {
-      setError('Saved memory is unreadable. Clear it and save again.');
+      setError('Saved memory is unreadable.');
     }
   }
 
@@ -411,7 +509,7 @@ function App() {
         <h1>Research Proposal Agent</h1>
         <span className="status-pill">
           <Sparkles size={16} aria-hidden="true" />
-          {result?.mode || (fieldSuggestions.length ? 'structuring' : 'ready')}
+          {result?.mode || (topicInput ? 'structuring' : 'ready')}
         </span>
       </header>
 
@@ -447,8 +545,8 @@ function App() {
 
           <div className="memory-bar">
             <div>
-              <strong>Memory</strong>
-              <span>{memorySavedAt ? `Saved ${formatSavedAt(memorySavedAt)}` : 'No saved workspace yet'}</span>
+              <strong>Memory Workspace Cache</strong>
+              <span>{memorySavedAt ? `Saved ${formatSavedAt(memorySavedAt)}` : 'No local workspace updates matching history data found.'}</span>
             </div>
             <div className="memory-actions">
               <button className="secondary" type="button" onClick={() => saveMemory()}>
@@ -465,14 +563,13 @@ function App() {
 
           {error ? <p className="error-banner">{error}</p> : null}
 
-
           <div className="workflow-grid" aria-label="Workflow stages">
             {STAGES.map(([number, title, description], index) => (
               <article className="stage-card" key={title}>
                 <div className="stage-topline">
                   <span className="stage-number">{number}</span>
-                  <span className={`stage-status ${stageStatus(index, fieldSuggestions, decisions, project, result)}`}>
-                    {stageLabel(index, fieldSuggestions, decisions, project, result)}
+                  <span className={`stage-status ${stageStatus(index, project, result)}`}>
+                    {stageLabel(index, project, result)}
                   </span>
                 </div>
                 <h3>{title}</h3>
@@ -481,165 +578,98 @@ function App() {
             ))}
           </div>
 
-          <div className="workspace-grid">
-            <section className="workspace-panel suggestions-panel">
-              <PanelHeader title="LLM Suggested Structure" meta={`${fieldSuggestions.length} fields`} />
-              {fieldSuggestions.length ? (
-                <div className="suggestion-deck">
-                  <div className="deck-progress">
-                    <span>{Math.min(suggestionIndex + 1, fieldSuggestions.length)} / {fieldSuggestions.length}</span>
-                    <strong>{acceptedSuggestionCount} accepted</strong>
-                  </div>
-                  {currentSuggestion ? (
-                    <article className="suggestion-card active-card" key={`${currentSuggestion.field}-${currentSuggestion.value}`}>
-                      <div className="card-line">
-                        <h3>{currentSuggestion.label || labelForField(currentSuggestion.field)}</h3>
-                        <span className={`priority ${String(currentSuggestion.confidence || 'medium').toLowerCase()}`}>
-                          {currentSuggestion.confidence || 'Medium'}
-                        </span>
-                      </div>
-                      <p>{currentSuggestion.value}</p>
-                      <small>{currentSuggestion.reason}</small>
-                      <div className="deck-actions">
-                        <button
-                          className={project[currentSuggestion.field] === currentSuggestion.value ? 'secondary accepted' : 'primary'}
-                          type="button"
-                          onClick={() => acceptSuggestion(currentSuggestion)}
-                        >
-                          <CheckCircle2 size={16} aria-hidden="true" />
-                          {project[currentSuggestion.field] === currentSuggestion.value ? 'Accepted' : 'Accept and Next'}
-                        </button>
-                        <button className="secondary" type="button" onClick={skipSuggestion}>
-                          Skip
-                        </button>
-                      </div>
-                    </article>
-                  ) : null}
-                  <div className="deck-nav">
-                    <button
-                      className="secondary"
-                      type="button"
-                      disabled={suggestionIndex === 0}
-                      onClick={() => setSuggestionIndex((current) => Math.max(current - 1, 0))}
-                    >
-                      Previous
-                    </button>
-                    <button
-                      className="secondary"
-                      type="button"
-                      disabled={suggestionIndex >= fieldSuggestions.length - 1}
-                      onClick={() => setSuggestionIndex((current) => Math.min(current + 1, fieldSuggestions.length - 1))}
-                    >
-                      Next
-                    </button>
-                  </div>
-                  <div className="deck-strip" aria-label="Suggestion progress">
-                    {fieldSuggestions.map((suggestion, index) => (
-                      <button
-                        key={`${suggestion.field}-${index}`}
-                        className={[
-                          'deck-dot',
-                          index === suggestionIndex ? 'current' : '',
-                          project[suggestion.field] === suggestion.value ? 'done' : ''
-                        ].join(' ')}
-                        type="button"
-                        aria-label={`Open ${suggestion.label || labelForField(suggestion.field)}`}
-                        onClick={() => setSuggestionIndex(index)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <EmptyState text="Enter a rough idea, then let the model structure it." compact />
-              )}
-            </section>
-
-            <section className="workspace-panel decisions-panel">
-              <PanelHeader title="Decision Needed" meta={`${decisions.length} open`} />
-              {decisions.length ? (
+          <div className="workspace-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <section className="workspace-panel options-panel">
+              <PanelHeader title="Research Strategy Guide" meta={`Step ${currentStepIndex + 1} of ${QUESTIONNAIRE_STEPS.length}`} />
+              
+              {currentStep ? (
                 <div className="decision-deck">
                   <div className="deck-progress">
-                    <span>{Math.min(decisionIndex + 1, decisions.length)} / {decisions.length}</span>
-                    <strong>{decisions.length} open</strong>
+                    <span>Progress Frame: {currentStep.title}</span>
+                    <strong>{Object.keys(selections).length} Fields Selected</strong>
                   </div>
-                  {currentDecision ? (
-                    <article className="decision-card active-card" key={currentDecision.id}>
-                      <h3>{currentDecision.title}</h3>
-                      <p>{currentDecision.question}</p>
-                      <div className="option-stack">
-                        {currentDecision.options.map((option) => (
+                  
+                  <article className="decision-card active-card">
+                    <h3 style={{ color: '#2f6f62', fontWeight: 800 }}>{currentStep.title}</h3>
+                    <p style={{ fontWeight: 600, fontSize: '1.02rem' }}>{currentStep.prompt}</p>
+                    
+                    <div className="option-stack">
+                      {currentStep.options.map((option) => {
+                        const isSelected = selections[currentStep.id] === option.key;
+                        return (
                           <button
                             className="option-button"
-                            key={`${currentDecision.id}-${option.label}`}
+                            key={option.key}
                             type="button"
-                            onClick={() => chooseOption(currentDecision, option)}
+                            onClick={() => handleSelectOption(currentStep, option)}
+                            style={isSelected ? { borderColor: '#2f6f62', background: '#edf8f4' } : {}}
                           >
-                            <strong>{option.label}</strong>
+                            <strong>Option {option.key}: {option.label}</strong>
                             <span>{option.value}</span>
-                            <small>{option.rationale}</small>
                           </button>
-                        ))}
-                      </div>
-                      <div className="deck-actions">
-                        <button className="secondary" type="button" onClick={skipDecision}>
-                          Skip
-                        </button>
-                      </div>
-                    </article>
-                  ) : null}
+                        );
+                      })}
+                    </div>
+                  </article>
+
                   <div className="deck-nav">
                     <button
                       className="secondary"
                       type="button"
-                      disabled={decisionIndex === 0}
-                      onClick={() => setDecisionIndex((current) => Math.max(current - 1, 0))}
+                      disabled={currentStepIndex === 0}
+                      onClick={() => setCurrentStepIndex((current) => Math.max(current - 1, 0))}
                     >
                       Previous
                     </button>
                     <button
                       className="secondary"
                       type="button"
-                      disabled={decisionIndex >= decisions.length - 1}
-                      onClick={() => setDecisionIndex((current) => Math.min(current + 1, decisions.length - 1))}
+                      disabled={currentStepIndex >= QUESTIONNAIRE_STEPS.length - 1}
+                      onClick={() => setCurrentStepIndex((current) => Math.min(current + 1, QUESTIONNAIRE_STEPS.length - 1))}
                     >
                       Next
                     </button>
                   </div>
-                  <div className="deck-strip" aria-label="Decision progress">
-                    {decisions.map((decision, index) => (
+
+                  <div className="deck-strip" aria-label="Strategy option milestones progress tracks">
+                    {QUESTIONNAIRE_STEPS.map((step, idx) => (
                       <button
-                        key={`${decision.id}-${index}`}
-                        className={['deck-dot', index === decisionIndex ? 'current' : ''].join(' ')}
+                        key={step.id}
+                        className={[
+                          'deck-dot',
+                          idx === currentStepIndex ? 'current' : '',
+                          selections[step.id] ? 'done' : ''
+                        ].join(' ')}
                         type="button"
-                        aria-label={`Open ${decision.title}`}
-                        onClick={() => setDecisionIndex(index)}
+                        aria-label={`Jump to structural requirement choice segment step ${step.title}`}
+                        onClick={() => setCurrentStepIndex(idx)}
                       />
                     ))}
                   </div>
                 </div>
               ) : (
-                <EmptyState text="No major decision is open. Review the accepted state or draft the proposal." compact />
+                <EmptyState text="Supply an initial proposal theme scope above to unpack questions." compact />
               )}
 
               <section className="custom-note">
-                <h3>Extra Note</h3>
+                <h3>Other Notes</h3>
                 <textarea
                   value={customNote}
                   onChange={(event) => setCustomNote(event.target.value)}
-                  placeholder={currentQuestion?.question || 'Add a detail the options missed.'}
+                  placeholder="Add other notes for your research proposal here"
                 />
                 <button className="primary" disabled={!customNote.trim() || status !== 'idle'} onClick={submitCustomNote} type="button">
                   {status === 'answering' ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
-                  Let LLM Integrate
+                  Inject Custom Constraints
                 </button>
               </section>
             </section>
 
             <section className="workspace-panel state-panel">
-              <PanelHeader title="Accepted Project State" meta={`${acceptedCount}/${PROJECT_FIELDS.length} ready`} />
+              <PanelHeader title="Proposal Parameters" meta={`${acceptedCount}/${PROJECT_FIELDS.length} fields filled`} />
               <label>
                 Project Title
-                <input value={project.title} onChange={(event) => updateProjectField('title', event.target.value)} />
+                <input value={project.title} onChange={(event) => updateProjectField('title', event.target.value)} placeholder="Provide your primary project working title structure parameters..." />
               </label>
               {PROJECT_FIELDS.map(([field, label]) => (
                 <label key={field}>
@@ -647,7 +677,7 @@ function App() {
                   <textarea value={project[field] || ''} onChange={(event) => updateProjectField(field, event.target.value)} />
                 </label>
               ))}
-              <button className="primary" disabled={!project.title || status !== 'idle'} onClick={generateProposal} type="button">
+              <button className="primary" disabled={!project.title || status !== 'idle'} onClick={generateProposal} type="button" style={{ marginTop: '8px', minHeight: '44px' }}>
                 {status === 'drafting' ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <FileText size={16} aria-hidden="true" />}
                 Generate Proposal
               </button>
@@ -656,7 +686,7 @@ function App() {
 
           <div className="workflow-columns">
             <section className="workflow-panel">
-              <h2>Run Log</h2>
+              <h2>Activity Log Stack</h2>
               {runLog.length ? (
                 <ol className="run-log">
                   {runLog.map((entry) => (
@@ -667,13 +697,13 @@ function App() {
                   ))}
                 </ol>
               ) : (
-                <EmptyState text="Run log appears after the idea is structured." compact />
+                <EmptyState text="Operations timeline stream activates when actions execute." compact />
               )}
             </section>
 
             <section className="workflow-panel artifacts-panel">
-              <div className="artifact-toolbar">
-                <nav className="tabs" aria-label="Generated artifacts">
+              <div className="artifact-toolbar" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                <nav className="tabs" aria-label="Generated workspace output assets panels">
                   {TABS.map(([id, Icon, label]) => (
                     <button
                       key={id}
@@ -686,6 +716,25 @@ function App() {
                     </button>
                   ))}
                 </nav>
+
+                {/* COMBOMOX: Version History Switcher Control */}
+                {versions.length > 0 && (
+                  <div className="version-selector" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                    <History size={16} style={{ color: '#4a5568' }} />
+                    <select 
+                      value={currentVersionIndex} 
+                      onChange={(e) => setCurrentVersionIndex(Number(e.target.value))}
+                      style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: '#fff', fontSize: '0.9rem', fontWeight: 600 }}
+                    >
+                      {versions.map((_, idx) => (
+                        <option key={idx} value={idx}>
+                          Version {idx + 1} {idx === versions.length - 1 ? '(Latest)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <button className="secondary" type="button" disabled={!result?.proposalLatex} onClick={downloadLatex}>
                   <Download size={17} aria-hidden="true" />
                   LaTeX
@@ -697,26 +746,52 @@ function App() {
                   onClick={downloadPdf}
                 >
                   {status === 'exporting' ? <Loader2 className="spin" size={17} aria-hidden="true" /> : <Download size={17} aria-hidden="true" />}
-                  PDF
+                  PDF Document
                 </button>
               </div>
 
               <div className="artifact-summary">
                 <div>
-                  <span>Coverage</span>
+                  <span>Rubric Requirements Covered</span>
                   <strong>{matrixStats.total ? `${matrixStats.covered}/${matrixStats.total}` : '0/0'}</strong>
                 </div>
                 <div>
-                  <span>Accepted</span>
+                  <span>Populated Input Profiles</span>
                   <strong>{acceptedCount}/{PROJECT_FIELDS.length}</strong>
                 </div>
                 <div>
-                  <span>Provider</span>
-                  <strong>{result?.provider || 'waiting'}</strong>
+                  <span>Active Model Engine</span>
+                  <strong>{result?.provider || 'Standby Fallback Mode'}</strong>
                 </div>
               </div>
 
               {renderArtifact(activeTab, result, pdfUrl)}
+
+              {/* MODULE: Revision Feedback Form Box */}
+              {result && (
+                <section className="custom-note revision-module" style={{ marginTop: '20px', borderTop: '2px dashed #cbd5e1', paddingTop: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '8px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#1a202c' }}>Propose Changes to Version {currentVersionIndex + 1}</h3>
+                    <span style={{ fontSize: '0.8rem', color: '#718096' }}>Submitting will generate Version {versions.length + 1}</span>
+                  </div>
+                  <textarea
+                    value={revisionNote}
+                    onChange={(event) => setRevisionNote(event.target.value)}
+                    placeholder="Provide actionable update requests (e.g., 'Expand the expected results section to include a quantitative timeline' or 'Fix formatting in the diagram caption')..."
+                    style={{ minHeight: '80px' }}
+                  />
+                  <button 
+                    className="primary" 
+                    disabled={!revisionNote.trim() || status !== 'idle'} 
+                    onClick={submitRevision} 
+                    type="button"
+                    style={{ backgroundColor: '#2b6cb0' }} // Subtle visual distinct coloring choice
+                  >
+                    {status === 'drafting' ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
+                    Submit Revision Request
+                  </button>
+                </section>
+              )}
             </section>
           </div>
         </section>
@@ -734,7 +809,7 @@ async function postJson(url, body) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.detail || data.error || 'Request failed.');
+    throw new Error(data.detail || data.error || 'Server interaction failed.');
   }
 
   return data;
@@ -752,7 +827,7 @@ async function exportPdfUrl(proposalLatex, title) {
 
   if (!response.ok) {
     const data = await response.json();
-    throw new Error(data.detail || data.error || 'PDF export failed.');
+    throw new Error(data.detail || data.error || 'LaTeX PDF engine compilation failed.');
   }
 
   const blob = await response.blob();
@@ -761,14 +836,14 @@ async function exportPdfUrl(proposalLatex, title) {
 
 function renderArtifact(activeTab, result, pdfUrl) {
   if (!result) {
-    return <EmptyState text="Proposal artifacts appear after Generate Proposal." />;
+    return <EmptyState text="Compilation target results show up here after running the generator layout framework pipeline." />;
   }
 
   if (activeTab === 'pdf') {
     return pdfUrl ? (
-      <iframe className="pdf-preview" src={pdfUrl} title="Compiled proposal PDF" />
+      <iframe className="pdf-preview" src={pdfUrl} title="Compiled structural proposal artifact PDF stream visualization layout viewer panel" />
     ) : (
-      <EmptyState text="PDF preview is rendering." />
+      <EmptyState text="The PDF output framework configuration script engine is rendering layout pipelines..." />
     );
   }
 
@@ -778,10 +853,10 @@ function renderArtifact(activeTab, result, pdfUrl) {
         <table>
           <thead>
             <tr>
-              <th>Requirement</th>
-              <th>Status</th>
-              <th>Evidence</th>
-              <th>Fix</th>
+              <th>Requirement Metric</th>
+              <th>Compliance State Status</th>
+              <th>Structural Text Evidence Context</th>
+              <th>Corrective Revision Patch Action</th>
             </tr>
           </thead>
           <tbody>
@@ -826,29 +901,24 @@ function EmptyState({ text, compact = false }) {
   );
 }
 
-function stageStatus(index, fieldSuggestions, decisions, project, result) {
-  if (index === 0 && fieldSuggestions.length) return 'status-complete';
-  if (index === 1 && decisions.length) return 'status-complete';
-  if (index === 2 && PROJECT_FIELDS.some(([field]) => project[field])) return 'status-complete';
+function stageStatus(index, project, result) {
+  if (index === 0 && (project.title || project.topic)) return 'status-complete';
+  if (index === 1 && PROJECT_FIELDS.some(([field]) => project[field])) return 'status-complete';
+  if (index === 2 && PROJECT_FIELDS.every(([field]) => project[field])) return 'status-complete';
   if (index >= 3 && result) return 'status-complete';
   return 'status-waiting';
 }
 
-function stageLabel(index, fieldSuggestions, decisions, project, result) {
-  if (index === 0 && fieldSuggestions.length) return 'Shown';
-  if (index === 1 && decisions.length) return 'Shown';
-  if (index === 2 && PROJECT_FIELDS.some(([field]) => project[field])) return 'Shown';
-  if (index >= 3 && result) return 'Shown';
-  return 'Ready';
+function stageLabel(index, project, result) {
+  if (index === 0 && (project.title || project.topic)) return 'Configured';
+  if (index === 1 && PROJECT_FIELDS.some(([field]) => project[field])) return 'Configuring';
+  if (index === 2 && PROJECT_FIELDS.every(([field]) => project[field])) return 'Assembled';
+  if (index >= 3 && result) return 'Render Complete';
+  return 'In Queue';
 }
 
 function countCovered(rows = []) {
   return rows.filter((row) => /^covered$/i.test(row.status)).length;
-}
-
-function labelForField(field) {
-  const found = PROJECT_FIELDS.find(([key]) => key === field);
-  return found?.[1] || 'Field';
 }
 
 function logEntry(stage, message) {
@@ -865,7 +935,6 @@ function readError(error) {
 
 function compactResult(result) {
   if (!result) return null;
-
   return {
     mode: result.mode,
     provider: result.provider,
@@ -878,15 +947,8 @@ function compactResult(result) {
 
 function formatSavedAt(value) {
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return 'recently';
-  }
-
-  return date.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  if (Number.isNaN(date.getTime())) return 'live sync';
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 export default App;

@@ -702,6 +702,7 @@ textarea:focus {
 
 .artifact-summary strong {
   color: #26363b;
+  overflow-wrap: break-word;
 }
 
 .artifact-block {

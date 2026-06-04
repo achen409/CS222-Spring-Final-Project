@@ -19,7 +19,9 @@ export async function proposalLatexToPdf(latex, title = 'proposal') {
 
   try {
     await writeFile(texPath, sanitizeLatexForExport(ensureCompleteLatexDocument(source, title)), 'utf8');
-    await execFileAsync('tectonic', ['--outdir', workdir, texPath], {
+
+    const tectonicPath = path.join(process.cwd(), 'tectonic.exe');
+    await execFileAsync(tectonicPath, ['--outdir', workdir, texPath], {
       cwd: workdir,
       timeout: 60000,
       maxBuffer: 1024 * 1024 * 8
