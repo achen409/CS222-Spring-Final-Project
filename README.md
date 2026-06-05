@@ -163,4 +163,4 @@ Stage 3 asks: **Is the final proposal itself strong?**
 
 ## GitHub Link (if zip file doesn't work)
 
-[text](https://github.com/achen409/CS222-Spring-Final-Project)
+[https://github.com/achen409/CS222-Spring-Final-Project](https://github.com/achen409/CS222-Spring-Final-Project)
