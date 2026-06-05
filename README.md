@@ -100,9 +100,6 @@ Stage 2 focuses on refined agent behavior and workflow usage evidence.
 Submit:
 
 - refined agent implementation or reproducible workflow artifact;
-- `workflow_usage.md`;
-- run transcript, screenshots, logs, or demo;
-- `AI_USAGE.md`;
 
 Details: [docs/stage_2_workflow_usage.md](docs/stage_2_workflow_usage.md)
 
@@ -163,3 +160,5 @@ Stage 1 asks: **What is your initial agent and proposal-writing workflow idea?**
 Stage 2 asks: **Did you refine and actually use that agent/workflow to produce proposal artifacts?**
 
 Stage 3 asks: **Is the final proposal itself strong?**
+
+## GitHub Link (if zip file doesn't work)
