@@ -165,9 +165,9 @@ function App() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [selections, setSelections] = useState({});
   const [customNote, setCustomNote] = useState('');
-  const [revisionNote, setRevisionNote] = useState(''); // State for revision module
   
-  // Revision State Arrays
+  // Revision & History State Variables
+  const [revisionNote, setRevisionNote] = useState(''); 
   const [versions, setVersions] = useState([]); 
   const [currentVersionIndex, setCurrentVersionIndex] = useState(-1);
 
@@ -179,7 +179,7 @@ function App() {
   const [memorySavedAt, setMemorySavedAt] = useState('');
   const [memoryReady, setMemoryReady] = useState(false);
 
-  // Derived current active artifact result
+  // Computes the active artifact safely from the state history array tracking indexes
   const result = useMemo(() => {
     return versions[currentVersionIndex] || null;
   }, [versions, currentVersionIndex]);
@@ -204,7 +204,7 @@ function App() {
     };
   }, [pdfUrl]);
 
-  // Handle PDF update trigger whenever the selected active version changes
+  // Synchronizes the PDF preview frames dynamically when the active user version selection switches
   useEffect(() => {
     async function triggerPdfSync() {
       if (result?.proposalLatex) {
@@ -268,7 +268,6 @@ function App() {
     setSelections(nextSelections);
 
     const targetField = step.field;
-    
     setProject((current) => ({
       ...current,
       [targetField]: `${step.title}: ${option.value}`,
@@ -330,15 +329,14 @@ function App() {
         requirements: DEFAULT_REQUIREMENTS
       });
 
-      // Append new version to array and point current view directly to it
-      setVersions((prev) => [...prev, data]);
-      setCurrentVersionIndex((prev) => prev + 1);
+      const nextVersions = [...versions, data];
+      setVersions(nextVersions);
+      setCurrentVersionIndex(nextVersions.length - 1);
       setActiveTab('pdf');
       
       setRunLog((current) => [
         ...current,
-        logEntry('Draft', `Generated initial proposal template version v${versions.length + 1} using ${data.mode}.`),
-        logEntry('Review', `Compliance rate is ${countCovered(data.complianceMatrix)}/${data.complianceMatrix?.length || 0}.`)
+        logEntry('Draft', `Generated initial proposal template version v${nextVersions.length} via context schema structure.`)
       ]);
     } catch (requestError) {
       setError(readError(requestError));
@@ -347,10 +345,10 @@ function App() {
     }
   }
 
-  // NEW: Function to submit revisions of the current LaTeX artifact to backend pipelines
+  // NEW: Executes revision pipelines by pushing current output artifacts + feedback parameters
   async function submitRevision() {
-    const trimmed = revisionNote.trim();
-    if (!trimmed || !result) return;
+    const trimmedComments = revisionNote.trim();
+    if (!trimmedComments || !result) return;
 
     setStatus('drafting');
     setError('');
@@ -360,20 +358,19 @@ function App() {
         ...project,
         topic: project.topic || project.title || topicInput,
         currentLatex: result.proposalLatex,
-        revisionComments: trimmed,
+        revisionComments: trimmedComments,
         requirements: DEFAULT_REQUIREMENTS
       });
 
-      // Append revision as a new active historical version block instance node
-      setVersions((prev) => [...prev, data]);
-      setCurrentVersionIndex((prev) => prev + 1);
-      setRevisionNote('');
+      const nextVersions = [...versions, data];
+      setVersions(nextVersions);
+      setCurrentVersionIndex(nextVersions.length - 1);
+      setRevisionNote(''); // clear revision note text on completion
       setActiveTab('pdf');
 
       setRunLog((current) => [
         ...current,
-        logEntry('Revision', `Generated revised version v${versions.length + 1} via feedback.`),
-        logEntry('Review', `Updated Compliance rate is ${countCovered(data.complianceMatrix)}/${data.complianceMatrix?.length || 0}.`)
+        logEntry('Revision', `Successfully engineered revised version v${nextVersions.length} implementation.`)
       ]);
     } catch (requestError) {
       setError(readError(requestError));
@@ -441,7 +438,7 @@ function App() {
       anchor.download = `proposal-v${currentVersionIndex + 1}.pdf`;
       anchor.click();
       if (!pdfUrl) URL.revokeObjectURL(href);
-      setRunLog((current) => [...current, logEntry('Export', `Downloaded compiled PDF structure configuration version v${currentVersionIndex + 1}.`)]);
+      setRunLog((current) => [...current, logEntry('Export', `Downloaded PDF configuration version version v${currentVersionIndex + 1}.`)]);
     } catch (requestError) {
       setError(readError(requestError));
     } finally {
@@ -702,7 +699,7 @@ function App() {
             </section>
 
             <section className="workflow-panel artifacts-panel">
-              <div className="artifact-toolbar" style={{ flexWrap: 'wrap', gap: '8px' }}>
+              <div className="artifact-toolbar" style={{ flexWrap: 'wrap', gap: '8px', display: 'flex', alignItems: 'center' }}>
                 <nav className="tabs" aria-label="Generated workspace output assets panels">
                   {TABS.map(([id, Icon, label]) => (
                     <button
@@ -717,14 +714,14 @@ function App() {
                   ))}
                 </nav>
 
-                {/* COMBOMOX: Version History Switcher Control */}
+                {/* VERSION SELECTOR COMBOBOX */}
                 {versions.length > 0 && (
                   <div className="version-selector" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
                     <History size={16} style={{ color: '#4a5568' }} />
                     <select 
                       value={currentVersionIndex} 
                       onChange={(e) => setCurrentVersionIndex(Number(e.target.value))}
-                      style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: '#fff', fontSize: '0.9rem', fontWeight: 600 }}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer' }}
                     >
                       {versions.map((_, idx) => (
                         <option key={idx} value={idx}>
@@ -735,7 +732,7 @@ function App() {
                   </div>
                 )}
 
-                <button className="secondary" type="button" disabled={!result?.proposalLatex} onClick={downloadLatex}>
+                <button className="secondary" type="button" disabled={!result?.proposalLatex} onClick={downloadLatex} style={{ marginLeft: versions.length === 0 ? 'auto' : '0' }}>
                   <Download size={17} aria-hidden="true" />
                   LaTeX
                 </button>
@@ -767,25 +764,29 @@ function App() {
 
               {renderArtifact(activeTab, result, pdfUrl)}
 
-              {/* MODULE: Revision Feedback Form Box */}
+              {/* REVISION SUBMISSION BOX MODULE */}
               {result && (
-                <section className="custom-note revision-module" style={{ marginTop: '20px', borderTop: '2px dashed #cbd5e1', paddingTop: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '8px' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#1a202c' }}>Propose Changes to Version {currentVersionIndex + 1}</h3>
-                    <span style={{ fontSize: '0.8rem', color: '#718096' }}>Submitting will generate Version {versions.length + 1}</span>
+                <section className="custom-note revision-module" style={{ marginTop: '24px', borderTop: '2px dashed #cbd5e1', paddingTop: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#1a202c', fontWeight: '700' }}>
+                      Propose Changes to Version {currentVersionIndex + 1}
+                    </h3>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '500' }}>
+                      Submitting generates Version {versions.length + 1}
+                    </span>
                   </div>
                   <textarea
                     value={revisionNote}
                     onChange={(event) => setRevisionNote(event.target.value)}
-                    placeholder="Provide actionable update requests (e.g., 'Expand the expected results section to include a quantitative timeline' or 'Fix formatting in the diagram caption')..."
-                    style={{ minHeight: '80px' }}
+                    placeholder="Provide comments or explicit revisions to apply to this draft version (e.g. 'Shorten the abstract' or 'Add a section detail describing risk mitigations')..."
+                    style={{ minHeight: '90px', width: '100%', marginBottom: '10px', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                   />
                   <button 
                     className="primary" 
                     disabled={!revisionNote.trim() || status !== 'idle'} 
                     onClick={submitRevision} 
                     type="button"
-                    style={{ backgroundColor: '#2b6cb0' }} // Subtle visual distinct coloring choice
+                    style={{ backgroundColor: '#2b6cb0', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}
                   >
                     {status === 'drafting' ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
                     Submit Revision Request
@@ -915,10 +916,6 @@ function stageLabel(index, project, result) {
   if (index === 2 && PROJECT_FIELDS.every(([field]) => project[field])) return 'Assembled';
   if (index >= 3 && result) return 'Render Complete';
   return 'In Queue';
-}
-
-function countCovered(rows = []) {
-  return rows.filter((row) => /^covered$/i.test(row.status)).length;
 }
 
 function logEntry(stage, message) {
