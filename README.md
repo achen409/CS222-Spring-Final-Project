@@ -1,5 +1,17 @@
 # Three-Stage Final Project: Research Proposal Agent
 
+## Submission/Run Information
+
+LLM_PROVIDER=gemini
+
+LLM_API_URL=https://generativelanguage.googleapis.com/v1beta
+
+LLM_MODEL=gemini-2.5-flash
+
+## GitHub Link (if zip file doesn't work)
+
+[https://github.com/achen409/CS222-Spring-Final-Project](https://github.com/achen409/CS222-Spring-Final-Project)
+
 ## Goal
 
 Build and evaluate a research proposal workflow. The project is not just about producing one polished PDF. It asks you to show that you understand how strong proposals are written, how an agent can support that process, and how the final proposal can be evaluated.
@@ -160,7 +172,3 @@ Stage 1 asks: **What is your initial agent and proposal-writing workflow idea?**
 Stage 2 asks: **Did you refine and actually use that agent/workflow to produce proposal artifacts?**
 
 Stage 3 asks: **Is the final proposal itself strong?**
-
-## GitHub Link (if zip file doesn't work)
-
-[https://github.com/achen409/CS222-Spring-Final-Project](https://github.com/achen409/CS222-Spring-Final-Project)
